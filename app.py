@@ -74,7 +74,6 @@ def dapatkan_transkrip(url):
         except Exception as e2: return None, f"Gagal menyedot subtitle. Error: {e2}"
 
 def cari_banyak_titik_potong(teks, jumlah):
-    # PROMPT BARU: Memaksa AI menjadi Copywriter
     prompt = f"""
     Kamu adalah Copywriter dan Editor Video TikTok viral yang jenius. Temukan {jumlah} bagian PALING MENARIK dari teks ini.
     Syarat:
@@ -83,10 +82,6 @@ def cari_banyak_titik_potong(teks, jumlah):
     
     Wajib balas HANYA dengan format ini (pisahkan dengan garis vertikal '|'):
     Detik_Mulai | Detik_Selesai | JUDUL HEADLINE VIRAL
-    
-    Contoh balasan untuk 2 klip:
-    120 | 175 | RAHASIA BESAR MARDIGU TERBONGKAR!
-    300 | 350 | JANGAN LAKUKAN INI SAAT SAHUR!
     
     Teks Transkrip:
     {teks}
@@ -101,14 +96,13 @@ def cari_banyak_titik_potong(teks, jumlah):
                 try:
                     mulai = int(bagian[0].strip())
                     selesai = int(bagian[1].strip())
-                    judul = bagian[2].strip() # Mengambil judul dari AI
+                    judul = bagian[2].strip()
                     hasil_klip.append((mulai, selesai, judul))
                 except: pass
         return hasil_klip[:jumlah], None
     except Exception as e: return None, f"AI gagal merespon. Error: {e}"
 
 def potong_video_sutradara(url, start, end, posisi, anti_banned, urutan):
-    markas_pabrik = os.path.dirname(os.path.abspath(__file__))
     output_name = f"Klip_Viral_{urutan}.mp4"
     if os.path.exists(output_name): os.remove(output_name)
     
@@ -130,9 +124,14 @@ def potong_video_sutradara(url, start, end, posisi, anti_banned, urutan):
         'download_ranges': yt_dlp.utils.download_range_func(None, [(start, end)]),
         'force_keyframes_at_cuts': True,
         'quiet': True,
-        'ffmpeg_location': markas_pabrik,
         'postprocessor_args': postprocessor_args
     }
+    
+    # KECERDASAN DETEKSI LOKASI ALAT (Lokal vs Awan)
+    markas_pabrik = os.path.dirname(os.path.abspath(__file__))
+    if os.path.exists(os.path.join(markas_pabrik, "ffmpeg.exe")):
+        ydl_opts['ffmpeg_location'] = markas_pabrik
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
     return output_name
@@ -161,7 +160,6 @@ if st.button("🪄 Cetak Mesin Cuan Sekarang!"):
                     st.markdown("### 🎬 Hasil Panen Kliping Anda:")
                     kolom_tampilan = st.columns(len(daftar_klip))
                     
-                    # Looping untuk memproses dan menampilkan judul
                     for i, (mulai, selesai, judul_viral) in enumerate(daftar_klip):
                         urutan_klip = i + 1
                         st.write(f"⏳ Sedang menjahit Klip {urutan_klip}...")
@@ -169,7 +167,6 @@ if st.button("🪄 Cetak Mesin Cuan Sekarang!"):
                             nama_file = potong_video_sutradara(url_youtube, mulai, selesai, posisi_kamera, mode_antibanned, urutan_klip)
                             
                             with kolom_tampilan[i]:
-                                # MENAMPILKAN JUDUL VIRAL DI ATAS VIDEO
                                 st.success(f"🔥 {judul_viral}") 
                                 st.video(nama_file)
                                 with open(nama_file, "rb") as file:
