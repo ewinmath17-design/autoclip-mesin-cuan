@@ -1,36 +1,28 @@
 import streamlit as st
 import re
-import os
 import subprocess
 from youtube_transcript_api import YouTubeTranscriptApi
 from yt_dlp import YoutubeDL
 
 st.set_page_config(page_title="Autoclip Engine", layout="centered")
 
-st.title("🚀 Autoclip Engine (Cloud Stable Edition)")
-st.write("Sekali klik, AI membedah video, memotong klip, dan menulis HEADLINE VIRAL!")
+st.title("🚀 Autoclip Engine (Ultra Stable)")
+st.write("Sekali klik, AI membedah video & membuat klip!")
 
 # =========================
-# AMBIL TRANSKRIP (FIXED VERSION)
+# AMBIL TRANSKRIP (VERSI PALING AMAN)
 # =========================
 def dapatkan_transkrip(url):
-    video_id = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", url)
-    if not video_id:
-        return None, "Link tidak valid"
+    video_id_match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11})", url)
+    
+    if not video_id_match:
+        return None, "Link YouTube tidak valid"
 
-    vid = video_id.group(1)
+    video_id = video_id_match.group(1)
 
     try:
-        transcript_list = YouTubeTranscriptApi.list_transcripts(vid)
-
-        try:
-            transcript = transcript_list.find_transcript(['id'])
-        except:
-            transcript = transcript_list.find_transcript(['en'])
-
-        data = transcript.fetch()
-        teks = " ".join([item['text'] for item in data])
-
+        transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        teks = " ".join([item['text'] for item in transcript])
         return teks, None
 
     except Exception as e:
@@ -50,7 +42,7 @@ def download_video(url):
 
 
 # =========================
-# POTONG VIDEO (FFMPEG)
+# POTONG VIDEO
 # =========================
 def potong_video(start, durasi, output):
     command = [
@@ -76,7 +68,7 @@ if st.button("🚀 Cetak Sekarang"):
         st.error("Masukkan link dulu!")
     else:
         with st.spinner("Memproses..."):
-            
+
             # 1️⃣ Ambil Transkrip
             st.write("1️⃣ Mengambil transkrip...")
             teks, error = dapatkan_transkrip(url)
@@ -92,13 +84,12 @@ if st.button("🚀 Cetak Sekarang"):
             download_video(url)
             st.success("Video berhasil didownload!")
 
-            # 3️⃣ Potong 60 detik pertama (demo)
+            # 3️⃣ Potong 60 detik pertama
             st.write("3️⃣ Membuat klip...")
             potong_video(0, 60, "hasil.mp4")
             st.success("Klip berhasil dibuat!")
 
-            # 4️⃣ Tampilkan Hasil
             st.video("hasil.mp4")
 
-            st.subheader("🧠 HEADLINE VIRAL:")
-            st.write(teks[:200] + "...")
+            st.subheader("🧠 HEADLINE SAMPLE:")
+            st.write(teks[:300] + "...")
