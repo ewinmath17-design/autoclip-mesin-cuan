@@ -5,179 +5,197 @@ import google.generativeai as genai
 from youtube_transcript_api import YouTubeTranscriptApi
 import yt_dlp
 
-# --- PENGATURAN HALAMAN ---
+# ==============================
+# PENGATURAN HALAMAN
+# ==============================
 st.set_page_config(page_title="AutoClip Cuan Engine", page_icon="🎬", layout="wide")
-st.title("📱 AutoClip Cuan Engine (Ultimate Edition)")
-st.write("Sekali klik, AI akan membedah video, mencetak klip, dan menulis HEADLINE VIRAL untuk Anda!")
+st.title("📱 AutoClip Cuan Engine (Cloud Stable Edition)")
+st.write("Sekali klik, AI membedah video, memotong klip, dan menulis HEADLINE VIRAL!")
 
-# --- SIDEBAR: KONTROL MESIN ---
-st.sidebar.header("🔑 Panel Kendali Utama")
-api_key = st.sidebar.text_input("1. Masukkan Gemini API Key:", type="password")
+# ==============================
+# SIDEBAR
+# ==============================
+st.sidebar.header("🔑 Panel Kendali")
+
+api_key = st.sidebar.text_input("Masukkan Gemini API Key:", type="password")
 
 st.sidebar.markdown("---")
-st.sidebar.header("🎥 Kendali Kamera")
 posisi_kamera = st.sidebar.radio(
-    "Posisi pembicara di video asli:",
-    ("Tengah (Default)", "Kiri (Host)", "Kanan (Tamu)")
+    "Posisi pembicara:",
+    ("Tengah", "Kiri", "Kanan")
 )
 
 st.sidebar.markdown("---")
-st.sidebar.header("🪄 Magic Multi-Clip")
-jumlah_klip = st.sidebar.slider("Berapa klip yang ingin dicetak?", min_value=1, max_value=5, value=3)
+jumlah_klip = st.sidebar.slider("Jumlah klip:", 1, 5, 3)
 
 st.sidebar.markdown("---")
-st.sidebar.header("🛡️ Tameng Algoritma")
-mode_antibanned = st.sidebar.checkbox("Aktifkan Anti-Banned TikTok", value=True)
+mode_antibanned = st.sidebar.checkbox("Aktifkan Anti-Banned", value=True)
 
 if not api_key:
-    st.warning("⚠️ Silakan masukkan Gemini API Key di panel sebelah kiri.")
+    st.warning("Masukkan Gemini API Key dulu.")
     st.stop()
 
 genai.configure(api_key=api_key)
 
-@st.cache_resource(show_spinner=False)
-def siapkan_model(_api_key):
-    try:
-        model_tersedia = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        for nama in model_tersedia:
-            if 'flash' in nama.lower() and '1.5' in nama.lower(): return genai.GenerativeModel(nama)
-        for nama in model_tersedia:
-            if 'pro' in nama.lower() and '1.5' in nama.lower(): return genai.GenerativeModel(nama)
-        for nama in model_tersedia:
-            if 'flash' in nama.lower(): return genai.GenerativeModel(nama)
-        if model_tersedia: return genai.GenerativeModel(model_tersedia[0])
-    except Exception: pass
-    return None
+# ==============================
+# LOAD MODEL GEMINI
+# ==============================
+@st.cache_resource
+def load_model():
+    models = [m.name for m in genai.list_models() if "generateContent" in m.supported_generation_methods]
+    for m in models:
+        if "flash" in m.lower():
+            return genai.GenerativeModel(m)
+    return genai.GenerativeModel(models[0])
 
-model = siapkan_model(api_key)
-if not model:
-    st.error("⚠️ Gagal terhubung ke Otak AI.")
-    st.stop()
+model = load_model()
 
+# ==============================
+# AMBIL TRANSKRIP
+# ==============================
 def dapatkan_transkrip(url):
     video_id = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", url)
-    if not video_id: return None, "Link YouTube tidak valid."
-    vid = video_id.group(1)
-    try:
-        transcript_list = YouTubeTranscriptApi.list_transcripts(vid)
-        try: transcript = transcript_list.find_transcript(['id'])
-        except: transcript = transcript_list.find_transcript(['en'])
-        transkrip_mentah = transcript.fetch()
-        teks_full = " ".join([t['text'] for t in transkrip_mentah])
-        return teks_full, None
-    except Exception:
-        try:
-            ytt_api = YouTubeTranscriptApi()
-            transkrip_mentah = ytt_api.fetch(vid, languages=['id', 'en'])
-            teks_full = " ".join([t.text if hasattr(t, 'text') else t['text'] for t in transkrip_mentah])
-            return teks_full, None
-        except Exception as e2: return None, f"Gagal menyedot subtitle. Error: {e2}"
+    if not video_id:
+        return None, "Link tidak valid"
 
-def cari_banyak_titik_potong(teks, jumlah):
+    vid = video_id.group(1)
+
+    try:
+        transcript = YouTubeTranscriptApi.get_transcript(vid, languages=['id','en'])
+        teks = " ".join([t['text'] for t in transcript])
+        return teks, None
+    except Exception as e:
+        return None, f"Gagal ambil subtitle: {e}"
+
+# ==============================
+# CARI TITIK POTONG AI
+# ==============================
+def cari_klip(teks, jumlah):
     prompt = f"""
-    Kamu adalah Copywriter dan Editor Video TikTok viral yang jenius. Temukan {jumlah} bagian PALING MENARIK dari teks ini.
-    Syarat:
-    1. Tiap bagian berdurasi 30-59 detik. Tidak boleh tumpang tindih waktunya.
-    2. Buatkan 1 JUDUL HEADLINE (Hook) yang sangat clickbait, memancing rasa penasaran, maksimal 7 kata untuk tiap bagian!
-    
-    Wajib balas HANYA dengan format ini (pisahkan dengan garis vertikal '|'):
-    Detik_Mulai | Detik_Selesai | JUDUL HEADLINE VIRAL
-    
-    Teks Transkrip:
+    Temukan {jumlah} bagian paling menarik dari teks berikut.
+    Durasi tiap bagian 30-59 detik.
+    Format jawaban:
+    DetikMulai | DetikSelesai | Judul Viral
+
     {teks}
     """
+
     try:
         response = model.generate_content(prompt)
-        baris_waktu = response.text.strip().split('\n')
-        hasil_klip = []
-        for baris in baris_waktu:
-            if '|' in baris:
-                bagian = baris.split('|')
-                try:
-                    mulai = int(bagian[0].strip())
-                    selesai = int(bagian[1].strip())
-                    judul = bagian[2].strip()
-                    hasil_klip.append((mulai, selesai, judul))
-                except: pass
-        return hasil_klip[:jumlah], None
-    except Exception as e: return None, f"AI gagal merespon. Error: {e}"
+        lines = response.text.strip().split("\n")
 
-def potong_video_sutradara(url, start, end, posisi, anti_banned, urutan):
-    output_name = f"Klip_Viral_{urutan}.mp4"
-    if os.path.exists(output_name): os.remove(output_name)
-    
-    if posisi == "Kiri (Host)": dasar_kamera = 'crop=ih*(9/16):ih:0:0'
-    elif posisi == "Kanan (Tamu)": dasar_kamera = 'crop=ih*(9/16):ih:iw-ow:0'
-    else: dasar_kamera = 'crop=ih*(9/16):ih'
-        
-    postprocessor_args = []
-    if anti_banned:
-        filter_visual = f"{dasar_kamera},setpts=0.95*PTS,eq=saturation=1.1"
-        filter_audio = "atempo=1.05"
-        postprocessor_args.extend(['-vf', filter_visual, '-af', filter_audio, '-map_metadata', '-1'])
+        hasil = []
+        for l in lines:
+            if "|" in l:
+                parts = l.split("|")
+                try:
+                    start = int(parts[0].strip())
+                    end = int(parts[1].strip())
+                    title = parts[2].strip()
+                    hasil.append((start, end, title))
+                except:
+                    pass
+        return hasil[:jumlah], None
+    except Exception as e:
+        return None, str(e)
+
+# ==============================
+# POTONG VIDEO (VERSI STABIL)
+# ==============================
+def potong_video(url, start, end, posisi, anti_banned, urutan):
+
+    output_name = f"klip_{urutan}.mp4"
+    if os.path.exists(output_name):
+        os.remove(output_name)
+
+    # crop 9:16
+    if posisi == "Kiri":
+        crop = "crop=ih*(9/16):ih:0:0"
+    elif posisi == "Kanan":
+        crop = "crop=ih*(9/16):ih:iw-ow:0"
     else:
-        postprocessor_args.extend(['-vf', dasar_kamera])
+        crop = "crop=ih*(9/16):ih"
+
+    filter_chain = crop
+
+    if anti_banned:
+        filter_chain += ",setpts=0.98*PTS,eq=saturation=1.05"
+        audio_filter = "atempo=1.02"
+    else:
+        audio_filter = None
+
+    post_args = ['-vf', filter_chain]
+    if audio_filter:
+        post_args += ['-af', audio_filter]
 
     ydl_opts = {
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        'format': 'best[ext=mp4]/best',
         'outtmpl': output_name,
         'download_ranges': yt_dlp.utils.download_range_func(None, [(start, end)]),
         'force_keyframes_at_cuts': True,
         'quiet': True,
-        'postprocessor_args': postprocessor_args
+        'postprocessors': [{
+            'key': 'FFmpegVideoConvertor',
+            'preferedformat': 'mp4',
+        }],
+        'postprocessor_args': {
+            'ffmpeg': post_args
+        }
     }
-    
-    # KECERDASAN DETEKSI LOKASI ALAT (Lokal vs Awan)
-    markas_pabrik = os.path.dirname(os.path.abspath(__file__))
-    if os.path.exists(os.path.join(markas_pabrik, "ffmpeg.exe")):
-        ydl_opts['ffmpeg_location'] = markas_pabrik
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
+
     return output_name
 
-# --- ANTARMUKA UTAMA ---
+# ==============================
+# UI UTAMA
+# ==============================
 st.markdown("---")
-url_youtube = st.text_input("🔗 Tempel Link YouTube di Sini:", placeholder="https://www.youtube.com/watch?v=...")
+url = st.text_input("Tempel Link YouTube:")
 
-if st.button("🪄 Cetak Mesin Cuan Sekarang!"):
-    if not url_youtube: st.error("Masukkan link YouTube dulu!")
+if st.button("🚀 Cetak Sekarang"):
+    if not url:
+        st.error("Masukkan link dulu")
     else:
-        with st.status(f"🚀 Menjalankan Pabrik... (Target: {jumlah_klip} Klip)", expanded=True) as status:
-            st.write("1️⃣ Menyedot transkrip video...")
-            teks, err_teks = dapatkan_transkrip(url_youtube)
-            if err_teks:
-                status.update(label="Gagal", state="error"); st.error(err_teks)
-            else:
-                st.write(f"2️⃣ Otak Gemini sedang menyeleksi {jumlah_klip} Hook sekaligus menulis Headline...")
-                daftar_klip, err_ai = cari_banyak_titik_potong(teks, jumlah_klip)
-                
-                if err_ai or not daftar_klip:
-                    status.update(label="Gagal", state="error"); st.error("AI kebingungan mencari titik potong.")
-                else:
-                    st.success(f"Berhasil! AI telah meracik {len(daftar_klip)} video beserta Headline-nya!")
-                    
-                    st.markdown("### 🎬 Hasil Panen Kliping Anda:")
-                    kolom_tampilan = st.columns(len(daftar_klip))
-                    
-                    for i, (mulai, selesai, judul_viral) in enumerate(daftar_klip):
-                        urutan_klip = i + 1
-                        st.write(f"⏳ Sedang menjahit Klip {urutan_klip}...")
-                        try:
-                            nama_file = potong_video_sutradara(url_youtube, mulai, selesai, posisi_kamera, mode_antibanned, urutan_klip)
-                            
-                            with kolom_tampilan[i]:
-                                st.success(f"🔥 {judul_viral}") 
-                                st.video(nama_file)
-                                with open(nama_file, "rb") as file:
-                                    st.download_button(
-                                        label=f"⬇️ Download Video",
-                                        data=file,
-                                        file_name=f"Klip_MasterEwin_{urutan_klip}.mp4",
-                                        mime="video/mp4",
-                                        key=f"btn_dl_{urutan_klip}"
-                                    )
-                        except Exception as e:
-                            st.error(f"Klip {urutan_klip} gagal diproses: {e}")
-                    
-                    status.update(label="✅ Produksi Massal Selesai!", state="complete", expanded=False)
+        with st.status("Memproses...", expanded=True):
+
+            st.write("1️⃣ Mengambil transkrip...")
+            teks, err = dapatkan_transkrip(url)
+
+            if err:
+                st.error(err)
+                st.stop()
+
+            st.write("2️⃣ AI memilih bagian viral...")
+            klip_list, err = cari_klip(teks, jumlah_klip)
+
+            if err or not klip_list:
+                st.error("AI gagal memilih klip")
+                st.stop()
+
+            st.success(f"Berhasil menemukan {len(klip_list)} klip!")
+
+            cols = st.columns(len(klip_list))
+
+            for i, (start, end, title) in enumerate(klip_list):
+                with cols[i]:
+                    st.write(f"⏳ Memproses klip {i+1}")
+
+                    try:
+                        file = potong_video(url, start, end, posisi_kamera, mode_antibanned, i+1)
+
+                        st.success(title)
+                        st.video(file)
+
+                        with open(file, "rb") as f:
+                            st.download_button(
+                                "Download",
+                                f,
+                                file_name=f"klip_{i+1}.mp4",
+                                mime="video/mp4"
+                            )
+                    except Exception as e:
+                        st.error(f"Gagal proses klip {i+1}: {e}")
+
+            st.success("✅ Semua proses selesai!")
