@@ -108,13 +108,11 @@ if st.button("🪄 Cetak Mesin Cuan Sekarang!", use_container_width=True):
                 # LANGKAH 1: MENYEDOT TRANSKRIP
                 st.write("1️⃣ Menyedot transkrip video dari YouTube...")
                 try:
-                    transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['id', 'en'])
+                    ytt_api = YouTubeTranscriptApi()
+                    fetched = ytt_api.fetch(video_id, languages=['id', 'en'])
+                    transcript_list = fetched.to_raw_data()
                     full_text = " ".join([t['text'] for t in transcript_list])
                     st.success("Transkrip berhasil disedot!")
-                except Exception as e:
-                    status.update(label="❌ Gagal Menyedot Transkrip", state="error", expanded=True)
-                    st.error(f"Video ini tidak memiliki Subtitle/CC yang menyala. Silakan gunakan video lain. Detail: {e}")
-                    st.stop()
 
                 # LANGKAH 2: OTAK GEMINI BEKERJA
                 st.write(f"2️⃣ Otak Gemini sedang menyeleksi {jumlah_klip} momen viral & menulis file Caption...")
@@ -208,4 +206,5 @@ if st.button("🪄 Cetak Mesin Cuan Sekarang!", use_container_width=True):
 
                 status.update(label="✅ PABRIK MASIF SELESAI! SEMUA KONTEN SIAP UPLOAD!", state="complete", expanded=True)
                 st.balloons()
+
 
