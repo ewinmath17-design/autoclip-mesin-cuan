@@ -6,7 +6,8 @@ import subprocess
 import re
 
 # --- 1. SETUP TAMPILAN HALAMAN ---
-st.set_page_config(page_title="AutoClip Cuan Engine - Ultimate Edition", page_icon="📱", layout="wide")
+st.set_page_config(page_title="AutoClip Cuan Engine - Ultimate", page_icon="📱", layout="wide")
+
 # ==========================================
 # 🔒 SISTEM GEMBOK KEAMANAN VIP 🔒
 # ==========================================
@@ -21,6 +22,7 @@ if kode_akses != PASSWORD_RAHASIA:
     st.info("💡 Belum punya akses? Hubungi Admin Kavling Digital untuk membeli lisensi.")
     st.stop() # Menghentikan mesin agar tidak bisa dipakai sebelum login
 # ==========================================
+
 # CSS Premium untuk tampilan aplikasi
 st.markdown("""
 <style>
@@ -32,7 +34,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 2. PANEL KENDALI (SIDEBAR) ---
-st.sidebar.markdown("### 🔑 Panel Kendali Utama")
+st.sidebar.markdown("### ⚙️ Pengaturan Mesin")
 api_key = st.sidebar.text_input("Masukkan Gemini API Key:", type="password", help="Dapatkan API Key gratis di Google AI Studio")
 
 st.sidebar.markdown("---")
@@ -41,12 +43,11 @@ kamera_fokus = st.sidebar.radio("Posisi pembicara di video asli:", ["Tengah (Def
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🎬 Magic Multi-Clip")
-# SEGEL PABRIK MASIF DIBUKA - BISA TARIK SAMPAI 20 KLIP!
 jumlah_klip = st.sidebar.slider("Berapa klip yang ingin dicetak?", min_value=1, max_value=20, value=3)
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🛡️ Tameng Algoritma")
-anti_banned = st.sidebar.checkbox("Aktifkan Anti-Banned TikTok", value=True, help="Manipulasi durasi 5% agar lolos filter unoriginal content TikTok")
+anti_banned = st.sidebar.checkbox("Aktifkan Anti-Banned (TikTok/FB Pro)", value=True, help="Manipulasi durasi 5% agar lolos filter unoriginal content")
 
 # --- 3. TAMPILAN UTAMA ---
 st.markdown('<div class="main-title">📱 AutoClip Cuan Engine (Ultimate Edition)</div>', unsafe_allow_html=True)
@@ -63,21 +64,18 @@ def bersihkan_nama_file(teks):
     return re.sub(r'[\\/*?:"<>|]', "", teks)
 
 def proses_pemotongan_video(url, start, end, output_filename, fokus, anti_ban):
-    # Logika crop untuk 9:16 portrait
     if fokus == "Kiri (Host)":
         crop_filter = "crop=ih*9/16:ih:0:0"
     elif fokus == "Kanan (Tamu)":
         crop_filter = "crop=ih*9/16:ih:iw-ih*9/16:0"
     else:
-        crop_filter = "crop=ih*9/16:ih:iw/2-ih*9/32:0" # Tengah
+        crop_filter = "crop=ih*9/16:ih:iw/2-ih*9/32:0" 
 
-    # Logika Anti-Banned (percepat video 5%)
     if anti_ban:
         filter_kompleks = f"{crop_filter},setpts=0.95*PTS;atempo=1.05"
     else:
         filter_kompleks = crop_filter
 
-    # Menggunakan yt-dlp dan ffmpeg secara langsung
     cmd = [
         "yt-dlp", "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4", 
         "--download-sections", f"*{start}-{end}",
@@ -105,7 +103,7 @@ if st.button("🪄 Cetak Mesin Cuan Sekarang!", use_container_width=True):
         if video_id:
             with st.status("🚀 Mengoperasikan Pabrik Cuan...", expanded=True) as status:
                 
-                # LANGKAH 1: MENYEDOT TRANSKRIP
+                # LANGKAH 1: MENYEDOT TRANSKRIP (VERSI TERBARU)
                 st.write("1️⃣ Menyedot transkrip video dari YouTube...")
                 try:
                     ytt_api = YouTubeTranscriptApi()
@@ -113,12 +111,16 @@ if st.button("🪄 Cetak Mesin Cuan Sekarang!", use_container_width=True):
                     transcript_list = fetched.to_raw_data()
                     full_text = " ".join([t['text'] for t in transcript_list])
                     st.success("Transkrip berhasil disedot!")
+                except Exception as e:
+                    status.update(label="❌ Gagal Menyedot Transkrip", state="error", expanded=True)
+                    st.error(f"Video ini tidak memiliki Subtitle/CC yang menyala. Silakan gunakan video lain. Detail: {e}")
+                    st.stop()
 
                 # LANGKAH 2: OTAK GEMINI BEKERJA
                 st.write(f"2️⃣ Otak Gemini sedang menyeleksi {jumlah_klip} momen viral & menulis file Caption...")
                 try:
                     genai.configure(api_key=api_key)
-                    model = genai.GenerativeModel('gemini-1.5-pro-latest') # Menggunakan model terbaru yang pintar
+                    model = genai.GenerativeModel('gemini-1.5-pro-latest')
                     
                     prompt = f"""
                     Kamu adalah Copywriter Direct Response dan Video Editor pro. Analisis transkrip YouTube ini.
@@ -139,7 +141,6 @@ if st.button("🪄 Cetak Mesin Cuan Sekarang!", use_container_width=True):
                     response = model.generate_content(prompt)
                     hasil_gemini = response.text.strip().split('\n')
                     
-                    # Memfilter hasil yang kosong
                     hasil_gemini = [baris for baris in hasil_gemini if "|" in baris]
                     
                     if not hasil_gemini:
@@ -150,7 +151,7 @@ if st.button("🪄 Cetak Mesin Cuan Sekarang!", use_container_width=True):
                     
                 except Exception as e:
                     status.update(label="❌ AI Mengalami Kendala", state="error", expanded=True)
-                    st.error(f"Gagal memproses AI. Pastikan API Key benar atau video tidak melanggar kebijakan keamanan (Crypto/Keuangan). Detail: {e}")
+                    st.error(f"Gagal memproses AI. Pastikan API Key benar. Detail: {e}")
                     st.stop()
 
                 # LANGKAH 3: PEMOTONGAN & PEMBUATAN FILE TXT
@@ -160,7 +161,7 @@ if st.button("🪄 Cetak Mesin Cuan Sekarang!", use_container_width=True):
                 if not os.path.exists(output_folder):
                     os.makedirs(output_folder)
 
-                kolom_hasil = st.columns(min(3, len(hasil_gemini))) # Tampilkan maksimal 3 kolom sejajar
+                kolom_hasil = st.columns(min(3, len(hasil_gemini)))
                 
                 for i, data in enumerate(hasil_gemini):
                     try:
@@ -176,18 +177,15 @@ if st.button("🪄 Cetak Mesin Cuan Sekarang!", use_container_width=True):
                         
                         st.write(f"⏳ Sedang menjahit Klip {i+1}: *{judul}*...")
                         
-                        # Eksekusi Pemotongan Video
                         sukses_potong = proses_pemotongan_video(link_youtube, start_time, end_time, nama_file_mp4, kamera_fokus, anti_banned)
                         
                         if sukses_potong:
-                            # MESIN AUTO-COPYWRITER (Mencetak File .txt)
                             with open(nama_file_txt, "w", encoding="utf-8") as f:
                                 f.write(f"🔥 JUDUL DI VIDEO:\n{judul}\n")
                                 f.write("=" * 30 + "\n\n")
                                 f.write(f"📝 CAPTION TIKTOK (Siap Copy-Paste):\n{caption}\n\n")
                                 f.write(f"🏷️ HASHTAG:\n{hashtags}\n")
 
-                            # Menampilkan Hasil di Layar
                             col_idx = i % 3
                             with kolom_hasil[col_idx]:
                                 st.markdown(f'<div class="success-box"><b>🔥 KLIP {i+1}:</b><br>{judul}</div>', unsafe_allow_html=True)
@@ -196,15 +194,12 @@ if st.button("🪄 Cetak Mesin Cuan Sekarang!", use_container_width=True):
                                     with open(nama_file_mp4, "rb") as vid_file:
                                         st.download_button(label=f"⬇️ Download Video {i+1}", data=vid_file, file_name=f"{judul}.mp4", mime="video/mp4", key=f"vid_{i}")
                                 
-                                # Tampilkan isi teks dan tombol download Teks
                                 st.markdown(f'<div class="txt-box"><b>📝 PREVIEW CAPTION:</b><br>{caption}<br><br>{hashtags}</div>', unsafe_allow_html=True)
                                 with open(nama_file_txt, "rb") as txt_file:
                                     st.download_button(label=f"📄 Download Text Caption", data=txt_file, file_name=f"Caption_Klip_{i+1}.txt", mime="text/plain", key=f"txt_{i}")
                                     
                     except Exception as e:
-                        st.warning(f"Klip {i+1} dilewati karena format AI tidak sesuai atau gagal render.")
+                        st.warning(f"Klip {i+1} dilewati karena kegagalan render.")
 
                 status.update(label="✅ PABRIK MASIF SELESAI! SEMUA KONTEN SIAP UPLOAD!", state="complete", expanded=True)
                 st.balloons()
-
-
