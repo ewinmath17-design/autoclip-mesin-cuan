@@ -7,7 +7,20 @@ import re
 
 # --- 1. SETUP TAMPILAN HALAMAN ---
 st.set_page_config(page_title="AutoClip Cuan Engine - Ultimate Edition", page_icon="📱", layout="wide")
+# ==========================================
+# 🔒 SISTEM GEMBOK KEAMANAN VIP 🔒
+# ==========================================
+st.sidebar.markdown("### 🔑 Gerbang Akses VIP")
+kode_akses = st.sidebar.text_input("Masukkan Password VIP Anda:", type="password")
 
+# Ganti "CUAN99" dengan password rahasia yang akan Master berikan ke pembeli
+PASSWORD_RAHASIA = "CUAN99" 
+
+if kode_akses != PASSWORD_RAHASIA:
+    st.error("🚨 MESIN TERKUNCI! Silakan masukkan Password VIP di panel kiri untuk membuka pabrik.")
+    st.info("💡 Belum punya akses? Hubungi Admin Kavling Digital untuk membeli lisensi.")
+    st.stop() # Menghentikan mesin agar tidak bisa dipakai sebelum login
+# ==========================================
 # CSS Premium untuk tampilan aplikasi
 st.markdown("""
 <style>
@@ -195,3 +208,4 @@ if st.button("🪄 Cetak Mesin Cuan Sekarang!", use_container_width=True):
 
                 status.update(label="✅ PABRIK MASIF SELESAI! SEMUA KONTEN SIAP UPLOAD!", state="complete", expanded=True)
                 st.balloons()
+
