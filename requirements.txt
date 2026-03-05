@@ -1,3 +1,4 @@
 streamlit
-youtube-transcript-api==0.6.1
+google-generativeai
+youtube-transcript-api
 yt-dlp
