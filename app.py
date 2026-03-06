@@ -120,7 +120,7 @@ if st.button("🪄 Cetak Mesin Cuan Sekarang!", use_container_width=True):
                 st.write(f"2️⃣ Otak Gemini sedang menyeleksi {jumlah_klip} momen viral & menulis file Caption...")
                 try:
                     genai.configure(api_key=api_key)
-                    model = genai.GenerativeModel('gemini-1.5-pro-latest')
+                    model = genai.GenerativeModel('gemini-1.5-pro')
                     
                     prompt = f"""
                     Kamu adalah Copywriter Direct Response dan Video Editor pro. Analisis transkrip YouTube ini.
@@ -203,3 +203,4 @@ if st.button("🪄 Cetak Mesin Cuan Sekarang!", use_container_width=True):
 
                 status.update(label="✅ PABRIK MASIF SELESAI! SEMUA KONTEN SIAP UPLOAD!", state="complete", expanded=True)
                 st.balloons()
+
